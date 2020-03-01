@@ -250,3 +250,32 @@
 - **1:12:59 联合体**
     - 1:13:40 联合体内存分布
     - 1:15:40 字节顺序的问题
+
+#### Lecture12 Cache Memory 观看记录📝
+- 01:09 内存的层级结构
+- 01:54 Cache的概念
+- 04:42 Cache的组织结构
+- 07:30 Cache读
+    - 07:30 Cache的寻址方式
+    - 10:38 Direct Mapped Cache(E = 1)
+    - 20:58 E-way Set Associative Cache(E = 2)
+- 35:38 Cache写
+    - write hit
+    - 36:11 wrtie through and write back(脏位)
+    - write miss
+    - 37:47 write-allocate and No-write-allocate
+- 39:40 英特尔i7的cache架构
+- 42:42 Cache性能的度量:MIss Rate, Hit Time, Miss Penalty
+- 44:53 关于Cache数量度量的例子
+- 46:58 写出缓存友好的代码
+- 50:57 Memory Mountain
+    - 53:48 Memory Mountain Test代码
+    - 56:30 Memory Mountain可视化代码
+    - 59:14 Ridges of temporal locality时间局部性的山脊
+- 1:03:53 重新排列循环
+    - 1:04:01 Matrix Multiplication例子
+    - 1:05:13 Miss Rate分析
+    - 1:08:05 Matrix Multiplication的总结
+- 1:10:31 分块技术
+    - 1:14:41 分块技术的Cache Miss分析
+    - 1:16:14 Blocking的效果分析
