@@ -263,7 +263,7 @@ int loadCache(work_set_t* work_set, size_t tag) {
 
 
 void print_cache_line(cache_line_t* cache_line) {
-    if (NULL == cache_line){
+    if (NULL == cache_line) {
         return;
     }
 
@@ -273,7 +273,7 @@ void print_cache_line(cache_line_t* cache_line) {
 }
 
 void print_work_set(work_set_t* work_set) {
-    if (NULL == work_set){
+    if (NULL == work_set) {
         return;
     }
 
@@ -286,7 +286,7 @@ void print_work_set(work_set_t* work_set) {
 }
 
 void print_reverse_work_set(work_set_t* work_set) {
-    if (NULL == work_set){
+    if (NULL == work_set) {
         return;
     }
 
@@ -574,7 +574,7 @@ void test5() {
     print_work_set(work_set);
     print_reverse_work_set(work_set);
 
-    bool isHit;
+    int isHit;
 
     printf("----------hit situation---------\n");
     isHit = loadCache(work_set, 0xffffffff);
@@ -586,32 +586,62 @@ void test5() {
     isHit = loadCache(work_set, 0xaaa);
     printf("is Hit %d\n", isHit);
 
-    // printg("----------eviction situation---------");
-    // new_cache_line->tag = 0xffff;
-    // isHit = loadCache(work_set, new_cache_line);
-    // printf("is Hit %d", isHit);
+    printf("----------------eviction situation----------------\n");
+    // warm up
+    for (size_t i = 0; i < 10; i++) {
+        isHit = loadCache(work_set, i);
+        printf("is Hit %d\n", isHit);
+    }
+
+    // envict the cache
+    isHit = loadCache(work_set, 0x11);
+    printf("is Hit %d\n", isHit);
 }
 
 int main(int argc, char* argv[])
 {
-    // mem_param_t mem_param = processArgs(argc, argv);
-    // trace_param_t trace_param;
+    mem_param_t mem_param = processArgs(argc, argv);
+    trace_param_t trace_param;
 
-    // int hit_count = 0;
-    // int miss_count = 0;
-    // int eviction_count = 0;
+    // int hit_count;
+    // int miss_count
+    // int eviction_count;
 
-    // FILE* fp = fopen(mem_param.tracefile, "r");
-    // while (fscanf(fp, "%c %lx,%ld", &trace_param.operation, &trace_param.address, &trace_param.size) != EOF) {
-    //     if (check_operation(trace_param.operation)) {
-    //         size_t block_offset = getBlockOffset(trace_param.address, mem_param.s, mem_param.b);
-    //         size_t set_index = getSetIndex(trace_param.address, mem_param.s, mem_param.b);
-    //         size_t tag = getTag(trace_param.address, mem_param.s, mem_param.b);
-    //         printf("line record : %lx %lx %lx\n", tag, set_index, block_offset);
-    //     }
-    // }
+    // hit_count = 0;
+    // miss_count = 0;
+    // eviction_count = 0;
+
+    size_t n_work_set = 1 << mem_param.s;
+    size_t n_cache_line = 1 << mem_param.b;
+    work_set_t** cache = (work_set_t**)malloc(n_work_set * sizeof(work_set_t*));
+
+    int i;
+    for (i = 0; i < n_work_set; i++) {
+        cache[i] = InitWorkSet(n_cache_line);
+    }
+
+    for (i = 0; i < n_work_set; i++) {
+        print_work_set(cache[i]);
+    }
+
+    bool isHit;
+
+    FILE* fp = fopen(mem_param.tracefile, "r");
+    while (fscanf(fp, "%c %lx,%ld", &trace_param.operation, &trace_param.address, &trace_param.size) != EOF) {
+        if (check_operation(trace_param.operation)) {
+            size_t block_offset = getBlockOffset(trace_param.address, mem_param.s, mem_param.b);
+            size_t set_index = getSetIndex(trace_param.address, mem_param.s, mem_param.b);
+            size_t tag = getTag(trace_param.address, mem_param.s, mem_param.b);
+            printf("line record : %lx %lx %lx\n", tag, set_index, block_offset);
+            isHit = loadCache(cache[set_index], tag);
+            printf("%c %lx,%ld %d\n", trace_param.operation, trace_param.address, trace_param.size, isHit);
+        }
+    }
+
+    // delete the space
 
     // printSummary(hit_count, miss_count, eviction_count);
+
     // work_set_t work_set;
     // work_set.head = NULL;
     // work_set.tail = NULL;
