@@ -10,6 +10,10 @@
 #include <fcntl.h>
 #include "cachelab.h"
 
+int hit_count;
+int miss_count;
+int eviction_count;
+
 struct MEM_PARAM {
     bool visable;
     int s;
@@ -56,27 +60,55 @@ void insertWorkSet(work_set_t* work_set, cache_line_t* cache_line) {
     }
 }
 
+void disConnectCacheLine(work_set_t* work_set, cache_line_t* cache_line) {
+    cache_line_t* last_cache = cache_line->last;
+    cache_line_t* next_cache = cache_line->next;
+
+    if (NULL != last_cache) {
+        last_cache->next = next_cache;
+    }
+
+    if (NULL != next_cache) {
+        next_cache->last = last_cache;
+    }
+
+    if (work_set->head == cache_line) {
+        work_set->head = next_cache;
+    }
+
+    if (work_set->tail == cache_line) {
+        work_set->tail = last_cache;
+    }
+
+    // remember to disconnect the cacheline
+    cache_line->last = NULL;
+    cache_line->next = NULL;
+}
+
 cache_line_t* popWorkSet(work_set_t* work_set) {
     cache_line_t* pop_element;
-    cache_line_t* last_element;
-    cache_line_t* next_element;
+    // cache_line_t* last_element;
+    // cache_line_t* next_element;
 
     if (NULL == work_set->tail)
         return NULL;
 
     pop_element = work_set->tail;
-    last_element = pop_element->last;
-    next_element = pop_element->next;
-    work_set->tail = last_element;
+    // last_element = pop_element->last;
+    // next_element = pop_element->next;
+    // work_set->tail = last_element;
 
-    if (NULL != last_element) {
-        last_element->next = next_element;
-    }
+    // if (NULL != last_element) {
+    //     last_element->next = next_element;
+    // }
 
-    if (NULL != next_element) {
-        next_element->last = last_element;
-    }
+    // if (NULL != next_element) {
+    //     next_element->last = last_element;
+    // }
 
+    // pop_element->last = NULL;
+    // pop_element->next = NULL;
+    disConnectCacheLine(work_set, pop_element);
     return pop_element;
 }
 
@@ -168,32 +200,19 @@ work_set_t* InitWorkSet(int line_num) {
     return work_set;
 }
 
-void disConnectCacheLine(work_set_t* work_set, cache_line_t* cache_line) {
-    cache_line_t* last_cache = cache_line->last;
-    cache_line_t* next_cache = cache_line->next;
+void freeWorkSet(work_set_t* work_set) {
+    cache_line_t* head_cache;
 
-    if (NULL != last_cache) {
-        last_cache->next = next_cache;
+    head_cache = work_set->head;
+    while (head_cache != NULL) {
+        free(head_cache);
+        head_cache = head_cache->next;
     }
-
-    if (NULL != next_cache) {
-        next_cache->last = last_cache;
-    }
-
-    if (work_set->head == cache_line) {
-        work_set->head = next_cache;
-    }
-
-    if (work_set->tail == cache_line) {
-        work_set->tail = last_cache;
-    }
-    // return cache_line;
-    // cache_line->valid = true;
-    // cache_line->tag = cache_line.tag;
-    // insertWorkSet(work_set, head_cache);
 }
 
-int loadCache(work_set_t* work_set, size_t tag) {
+
+
+int accessCache(work_set_t* work_set, size_t tag) {
     bool available = false;
 
     cache_line_t* head_cache = work_set->head;
@@ -208,18 +227,7 @@ int loadCache(work_set_t* work_set, size_t tag) {
     // while (head_cache != tail_cache) {
     while (NULL != head_cache) {
         if (head_cache->valid && (head_cache->tag == tag)) {
-            // pop_element
-            // head_cache != NULL
-            // cache_line_t* last_cache = head_cache->last;
-            // cache_line_t* next_cache = head_cache->next;
-
-            // if (NULL != last_cache) {
-            //     last_cache->next = next_cache;
-            // }
-
-            // if (NULL != next_cache) {
-            //     next_cache->last = last_cache;
-            // }
+            hit_count += 1;
             disConnectCacheLine(work_set, head_cache);
             head_cache->valid = true;
             head_cache->tag = tag;
@@ -236,16 +244,7 @@ int loadCache(work_set_t* work_set, size_t tag) {
     }
 
     if (available) {
-        // cache_line_t* last_cache = available_cache->last;
-        // cache_line_t* next_cache = available_cache->next;
-
-        // if (NULL != last_cache) {
-        //     last_cache->next = next_cache;
-        // }
-
-        // if (NULL != next_cache) {
-        //     next_cache->last = last_cache;
-        // }
+        miss_count += 1;
         disConnectCacheLine(work_set, available_cache);
         available_cache->valid = true;
         available_cache->tag = tag;
@@ -254,8 +253,11 @@ int loadCache(work_set_t* work_set, size_t tag) {
     }
     else {
         // eviction
+        miss_count += 1;
+        eviction_count += 1;
         cache_line_t* pop_cache_line = popWorkSet(work_set);
         pop_cache_line->valid = true;
+        pop_cache_line->tag = tag;
         insertWorkSet(work_set, pop_cache_line);
         return -1;
     }
@@ -296,6 +298,13 @@ void print_reverse_work_set(work_set_t* work_set) {
         print_cache_line(travase_cache);
         travase_cache = travase_cache->last;
     };
+}
+
+void print_cache(work_set_t** cache, int n_work_set) {
+    int i;
+    for (i = 0; i < n_work_set; i++) {
+        print_work_set(cache[i]);
+    }
 }
 
 void print_mem_param(mem_param_t mem_param) {
@@ -389,20 +398,12 @@ struct MEM_PARAM processArgs(int argc, char* argv[]) {
                 break;
         }
     }
-
-    print_mem_param(mem_param);
     return mem_param;
 }
 
 bool check_operation(char operation) {
     return operation == 'M' || operation == 'L' || operation == 'S';
 }
-
-// void init_cache() {
-    
-// }
-
-
 
 size_t getTag(size_t address, int s, int b) {
     size_t tag;
@@ -425,6 +426,51 @@ size_t getBlockOffset(size_t address, int s, int b) {
     block_offset = address & set_mask;
     return block_offset;
 }
+
+char* getHitString(int isHit) {
+    if (isHit > 0) {
+        return "hit";
+    }
+    else if (isHit == 0) {
+        return "miss";
+    }
+    else {
+        return "miss eviction";
+    }
+}
+
+char* loadCache(work_set_t* work_set, size_t tag) {
+    int isHit;
+    char* loadString;
+
+    loadString = (char*)malloc(50);
+    isHit = accessCache(work_set, tag);
+    strcpy(loadString, getHitString(isHit));
+    return loadString;
+}
+
+char* storeCache(work_set_t* work_set, size_t tag) {
+    int isHit;
+    char* storeString;
+
+    storeString = (char*)malloc(50);
+    isHit = accessCache(work_set, tag);
+    strcpy(storeString, getHitString(isHit));
+    return storeString;
+}
+
+char* modifyCache(work_set_t* work_set, size_t tag) {
+    char* modifyString;
+    char* s;
+
+    modifyString = loadCache(work_set, tag);
+    s = storeCache(work_set, tag);
+    strcat(modifyString, " ");
+    strcat(modifyString, s);
+    free(s);
+    return modifyString;
+}
+
 
 // void LRU_Cache_Hit(work_set_t work_set, size_t tag) {
 //     cache_line_t address = popWorkSet(work_set);
@@ -554,10 +600,10 @@ void test4() {
 }
 
 /* 
- * test5 : test the loadCache function
+ * test5 : test the accessCache function
  */
 void test5() {
-    printf("---------------------test5 loadCache function---------------------\n");
+    printf("---------------------test5 accessCache function---------------------\n");
     work_set_t* work_set = InitWorkSet(10);
     print_work_set(work_set);
     print_reverse_work_set(work_set);
@@ -577,42 +623,54 @@ void test5() {
     int isHit;
 
     printf("----------hit situation---------\n");
-    isHit = loadCache(work_set, 0xffffffff);
+    isHit = accessCache(work_set, 0xffffffff);
     printf("is Hit %d\n", isHit);
 
 
     printf("----------miss situation--------\n");
     // new_cache_line->tag = 0xaaa;
-    isHit = loadCache(work_set, 0xaaa);
+    isHit = accessCache(work_set, 0xaaa);
     printf("is Hit %d\n", isHit);
 
     printf("----------------eviction situation----------------\n");
     // warm up
     for (size_t i = 0; i < 10; i++) {
-        isHit = loadCache(work_set, i);
+        isHit = accessCache(work_set, i);
         printf("is Hit %d\n", isHit);
     }
 
     // envict the cache
-    isHit = loadCache(work_set, 0x11);
+    isHit = accessCache(work_set, 0x11);
     printf("is Hit %d\n", isHit);
 }
+
+/* 
+ * test6 : test the accessCache function
+ */
+// void test6() {
+//     int isHit;
+//     isHit = 1;
+//     printf("%s\n", getHitString(isHit));
+//     isHit = 0;
+//     printf("%s\n", getHitString(isHit));
+//     isHit = -1;
+//     printf("%s\n", getHitString(isHit));
+// }
+
 
 int main(int argc, char* argv[])
 {
     mem_param_t mem_param = processArgs(argc, argv);
     trace_param_t trace_param;
 
-    // int hit_count;
-    // int miss_count
-    // int eviction_count;
+
 
     // hit_count = 0;
     // miss_count = 0;
     // eviction_count = 0;
 
     size_t n_work_set = 1 << mem_param.s;
-    size_t n_cache_line = 1 << mem_param.b;
+    size_t n_cache_line = mem_param.e;
     work_set_t** cache = (work_set_t**)malloc(n_work_set * sizeof(work_set_t*));
 
     int i;
@@ -620,27 +678,38 @@ int main(int argc, char* argv[])
         cache[i] = InitWorkSet(n_cache_line);
     }
 
-    for (i = 0; i < n_work_set; i++) {
-        print_work_set(cache[i]);
-    }
-
-    bool isHit;
+    char* hitString;
 
     FILE* fp = fopen(mem_param.tracefile, "r");
     while (fscanf(fp, "%c %lx,%ld", &trace_param.operation, &trace_param.address, &trace_param.size) != EOF) {
         if (check_operation(trace_param.operation)) {
-            size_t block_offset = getBlockOffset(trace_param.address, mem_param.s, mem_param.b);
+            // size_t block_offset = getBlockOffset(trace_param.address, mem_param.s, mem_param.b);
             size_t set_index = getSetIndex(trace_param.address, mem_param.s, mem_param.b);
             size_t tag = getTag(trace_param.address, mem_param.s, mem_param.b);
-            printf("line record : %lx %lx %lx\n", tag, set_index, block_offset);
-            isHit = loadCache(cache[set_index], tag);
-            printf("%c %lx,%ld %d\n", trace_param.operation, trace_param.address, trace_param.size, isHit);
+            if (trace_param.operation == 'L') {
+                hitString = loadCache(cache[set_index], tag);
+            }
+            else if (trace_param.operation == 'S') {
+                hitString = storeCache(cache[set_index], tag);
+            }
+            else {
+                hitString = modifyCache(cache[set_index], tag);
+            }
+            if (mem_param.visable) {
+                // printf("line record : %lx %lx %lx\n", tag, set_index, block_offset);
+                printf("%c %lx,%ld %s\n", trace_param.operation, trace_param.address, trace_param.size, hitString);
+            }
+            free(hitString);
         }
     }
 
     // delete the space
+    for (i = 0; i < n_work_set; i++) {
+        freeWorkSet(cache[i]);
+        free(cache[i]);
+    }
 
-    // printSummary(hit_count, miss_count, eviction_count);
+    printSummary(hit_count, miss_count, eviction_count);
 
     // work_set_t work_set;
     // work_set.head = NULL;
@@ -656,5 +725,6 @@ int main(int argc, char* argv[])
     // test3();
     // test4();
     // test5();
+    // test6();
     return 0;
 }
