@@ -46,224 +46,6 @@ typedef struct TRACE_PARAM trace_param_t;
 typedef struct CACHE_LINE cache_line_t;
 typedef struct WORK_SET work_set_t;
 
-
-void insertWorkSet(work_set_t* work_set, cache_line_t* cache_line) {
-    cache_line_t* origin_head = work_set->head;
-    work_set->head = cache_line;
-    cache_line->next = origin_head;
-
-    if (NULL != origin_head) {
-        origin_head->last = cache_line;
-    }
-    else {
-        work_set->tail = cache_line;
-    }
-}
-
-void disConnectCacheLine(work_set_t* work_set, cache_line_t* cache_line) {
-    cache_line_t* last_cache = cache_line->last;
-    cache_line_t* next_cache = cache_line->next;
-
-    if (NULL != last_cache) {
-        last_cache->next = next_cache;
-    }
-
-    if (NULL != next_cache) {
-        next_cache->last = last_cache;
-    }
-
-    if (work_set->head == cache_line) {
-        work_set->head = next_cache;
-    }
-
-    if (work_set->tail == cache_line) {
-        work_set->tail = last_cache;
-    }
-
-    // remember to disconnect the cacheline
-    cache_line->last = NULL;
-    cache_line->next = NULL;
-}
-
-cache_line_t* popWorkSet(work_set_t* work_set) {
-    cache_line_t* pop_element;
-    // cache_line_t* last_element;
-    // cache_line_t* next_element;
-
-    if (NULL == work_set->tail)
-        return NULL;
-
-    pop_element = work_set->tail;
-    // last_element = pop_element->last;
-    // next_element = pop_element->next;
-    // work_set->tail = last_element;
-
-    // if (NULL != last_element) {
-    //     last_element->next = next_element;
-    // }
-
-    // if (NULL != next_element) {
-    //     next_element->last = last_element;
-    // }
-
-    // pop_element->last = NULL;
-    // pop_element->next = NULL;
-    disConnectCacheLine(work_set, pop_element);
-    return pop_element;
-}
-
-// cache_line_t* popWorkSet(work_set_t* work_set, cache_line_t* cache_line) {
-//     cache_line_t* last_element;
-//     cache_line_t* next_element;
-
-//     last_element = cache_line->last;
-//     next_element = cache_line->next;
-
-//     if (NULL != last_element) {
-//         last_element->next = next_element;
-//     }
-
-//     // if (NULL != next_element) {
-//     //     next_element->last = last_element;
-//     // }
-
-//     return pop_element;
-// }
-/* 
- * isHit 
- *  0 : miss
- *  1 : Hit
- * -1 : full_cache
- */
-int isWorkSetHit(work_set_t* work_set, cache_line_t cache_line) {
-    // bool available = false;
-
-    cache_line_t* head_cache = work_set->head;
-    cache_line_t* tail_cache = work_set->tail;
-
-    // workset should not be empty when load data
-    if (NULL == head_cache) {
-        exit(5);
-    }
-
-    while (head_cache != tail_cache) {
-        // if (!head_cache->valid) {
-        //     available = true;
-        // }
-
-        // Hit situation
-        if (head_cache->valid && head_cache->tag == cache_line.tag)
-            return 1;
-
-        head_cache = head_cache->next;
-    }
-
-    // if search not hit , we arrive the WorkSet tail
-    if (head_cache == tail_cache) {
-        if (head_cache->valid && tail_cache->tag == cache_line.tag) {
-            return 1;
-        }
-        else if (head_cache->valid && tail_cache->tag != cache_line.tag) {
-            return -1;
-        }
-    }
-
-    return 0;
-}
-
-work_set_t* InitWorkSet(int line_num) {
-    if (line_num <= 0)
-        exit(6);
-
-    work_set_t* work_set;
-    work_set = (work_set_t *)malloc(sizeof(work_set_t));
-    memset(work_set, 0, sizeof(work_set_t));
-
-    cache_line_t* head_cache;
-    cache_line_t* last_cache;
-    cache_line_t* iter_cache;
-
-    head_cache = (cache_line_t *)malloc(sizeof(cache_line_t));
-    memset(head_cache, 0, sizeof(cache_line_t));
-    last_cache = head_cache;
-
-    work_set->head = head_cache;
-    work_set->tail = last_cache;
-
-    for (int i = 1; i < line_num; i++) {
-        iter_cache = (cache_line_t *)malloc(sizeof(cache_line_t));
-        // last_cache->next = iter_cache;
-        // last_cache = last_cache->next;
-        insertWorkSet(work_set, iter_cache);
-    }
-
-    return work_set;
-}
-
-void freeWorkSet(work_set_t* work_set) {
-    cache_line_t* head_cache;
-
-    head_cache = work_set->head;
-    while (head_cache != NULL) {
-        free(head_cache);
-        head_cache = head_cache->next;
-    }
-}
-
-
-
-int accessCache(work_set_t* work_set, size_t tag) {
-    bool available = false;
-
-    cache_line_t* head_cache = work_set->head;
-    // cache_line_t* tail_cache = work_set->tail;
-    cache_line_t* available_cache = NULL;
-
-    // workset should not be empty when load data
-    if (NULL == head_cache) {
-        exit(5);
-    }
-
-    // while (head_cache != tail_cache) {
-    while (NULL != head_cache) {
-        if (head_cache->valid && (head_cache->tag == tag)) {
-            hit_count += 1;
-            disConnectCacheLine(work_set, head_cache);
-            head_cache->valid = true;
-            head_cache->tag = tag;
-            insertWorkSet(work_set, head_cache);
-            return 1;
-        }
-
-        if (!head_cache->valid) {
-            available = true;
-            available_cache = head_cache;
-        }
-
-        head_cache = head_cache->next;
-    }
-
-    if (available) {
-        miss_count += 1;
-        disConnectCacheLine(work_set, available_cache);
-        available_cache->valid = true;
-        available_cache->tag = tag;
-        insertWorkSet(work_set, available_cache);
-        return 0;
-    }
-    else {
-        // eviction
-        miss_count += 1;
-        eviction_count += 1;
-        cache_line_t* pop_cache_line = popWorkSet(work_set);
-        pop_cache_line->valid = true;
-        pop_cache_line->tag = tag;
-        insertWorkSet(work_set, pop_cache_line);
-        return -1;
-    }
-}
-
-
 void print_cache_line(cache_line_t* cache_line) {
     if (NULL == cache_line) {
         return;
@@ -321,6 +103,143 @@ void print_trace_param(trace_param_t trace_param) {
     printf("operation : %c\n", trace_param.operation);
     printf("address : %lx\n", trace_param.address);
     printf("size : %ld\n", trace_param.size);
+}
+
+void insertWorkSet(work_set_t* work_set, cache_line_t* cache_line) {
+    cache_line_t* origin_head = work_set->head;
+    work_set->head = cache_line;
+    cache_line->next = origin_head;
+
+    if (NULL != origin_head) {
+        origin_head->last = cache_line;
+    }
+    else {
+        work_set->tail = cache_line;
+    }
+}
+
+void disConnectCacheLine(work_set_t* work_set, cache_line_t* cache_line) {
+    cache_line_t* last_cache = cache_line->last;
+    cache_line_t* next_cache = cache_line->next;
+
+    if (NULL != last_cache) {
+        last_cache->next = next_cache;
+    }
+
+    if (NULL != next_cache) {
+        next_cache->last = last_cache;
+    }
+
+    if (work_set->head == cache_line) {
+        work_set->head = next_cache;
+    }
+
+    if (work_set->tail == cache_line) {
+        work_set->tail = last_cache;
+    }
+
+    // remember to disconnect the cacheline
+    cache_line->last = NULL;
+    cache_line->next = NULL;
+}
+
+cache_line_t* popWorkSet(work_set_t* work_set) {
+    cache_line_t* pop_element;
+    if (NULL == work_set->tail)
+        return NULL;
+
+    pop_element = work_set->tail;
+    disConnectCacheLine(work_set, pop_element);
+    return pop_element;
+}
+
+work_set_t* InitWorkSet(int line_num) {
+    if (line_num <= 0)
+        exit(6);
+
+    work_set_t* work_set;
+    work_set = (work_set_t *)malloc(sizeof(work_set_t));
+    memset(work_set, 0, sizeof(work_set_t));
+
+    cache_line_t* head_cache;
+    cache_line_t* last_cache;
+    cache_line_t* iter_cache;
+
+    head_cache = (cache_line_t *)malloc(sizeof(cache_line_t));
+    memset(head_cache, 0, sizeof(cache_line_t));
+    last_cache = head_cache;
+
+    work_set->head = head_cache;
+    work_set->tail = last_cache;
+
+    for (int i = 1; i < line_num; i++) {
+        iter_cache = (cache_line_t *)malloc(sizeof(cache_line_t));
+        // last_cache->next = iter_cache;
+        // last_cache = last_cache->next;
+        insertWorkSet(work_set, iter_cache);
+    }
+
+    return work_set;
+}
+
+void freeWorkSet(work_set_t* work_set) {
+    cache_line_t* head_cache;
+
+    head_cache = work_set->head;
+    while (head_cache != NULL) {
+        free(head_cache);
+        head_cache = head_cache->next;
+    }
+}
+
+int accessCache(work_set_t* work_set, size_t tag) {
+    bool available = false;
+
+    cache_line_t* head_cache = work_set->head;
+    cache_line_t* available_cache = NULL;
+
+    // workset should not be empty when load data
+    if (NULL == head_cache) {
+        exit(5);
+    }
+
+    // while (head_cache != tail_cache) {
+    while (NULL != head_cache) {
+        if (head_cache->valid && (head_cache->tag == tag)) {
+            hit_count += 1;
+            disConnectCacheLine(work_set, head_cache);
+            head_cache->valid = true;
+            head_cache->tag = tag;
+            insertWorkSet(work_set, head_cache);
+            return 1;
+        }
+
+        if (!head_cache->valid) {
+            available = true;
+            available_cache = head_cache;
+        }
+
+        head_cache = head_cache->next;
+    }
+
+    if (available) {
+        miss_count += 1;
+        disConnectCacheLine(work_set, available_cache);
+        available_cache->valid = true;
+        available_cache->tag = tag;
+        insertWorkSet(work_set, available_cache);
+        return 0;
+    }
+    else {
+        // eviction
+        miss_count += 1;
+        eviction_count += 1;
+        cache_line_t* pop_cache_line = popWorkSet(work_set);
+        pop_cache_line->valid = true;
+        pop_cache_line->tag = tag;
+        insertWorkSet(work_set, pop_cache_line);
+        return -1;
+    }
 }
 
 void print_help() {
@@ -471,12 +390,6 @@ char* modifyCache(work_set_t* work_set, size_t tag) {
     return modifyString;
 }
 
-
-// void LRU_Cache_Hit(work_set_t work_set, size_t tag) {
-//     cache_line_t address = popWorkSet(work_set);
-
-// }
-
 /* 
  * test1 : test the insert function
  */
@@ -499,11 +412,6 @@ void test1() {
     insertWorkSet(work_set, new_cache_line);
     print_work_set(work_set);
     print_reverse_work_set(work_set);
-
-    // if we insert the same struct in the list,
-    // we can triger a very interesting question
-    // insertWorkSet(work_set, new_cache_line);
-    // print_work_set(work_set);
 
     for (int i = 0; i < 10; i++) {
         new_cache_line = (cache_line_t*)malloc(sizeof(cache_line_t));
@@ -585,18 +493,6 @@ void test4() {
     disConnectCacheLine(work_set, new_cache_line);
     print_work_set(work_set);
     print_reverse_work_set(work_set);
-    // work_set_t* work_set = InitWorkSet(10);
-    // print_work_set(work_set);
-
-    // printf("---------------------\n");
-    // cache_line_t* new_cache_line = (cache_line_t*)malloc(sizeof(cache_line_t));
-    // new_cache_line->valid = true;
-    // new_cache_line->tag = 0xffffffff;
-    // print_cache_line(new_cache_line);
-
-    // printf("---------------------\n");
-    // insertWorkSet(work_set, new_cache_line);
-    // print_work_set(work_set);
 }
 
 /* 
@@ -628,7 +524,6 @@ void test5() {
 
 
     printf("----------miss situation--------\n");
-    // new_cache_line->tag = 0xaaa;
     isHit = accessCache(work_set, 0xaaa);
     printf("is Hit %d\n", isHit);
 
@@ -647,27 +542,21 @@ void test5() {
 /* 
  * test6 : test the accessCache function
  */
-// void test6() {
-//     int isHit;
-//     isHit = 1;
-//     printf("%s\n", getHitString(isHit));
-//     isHit = 0;
-//     printf("%s\n", getHitString(isHit));
-//     isHit = -1;
-//     printf("%s\n", getHitString(isHit));
-// }
+void test6() {
+    int isHit;
+    isHit = 1;
+    printf("%s\n", getHitString(isHit));
+    isHit = 0;
+    printf("%s\n", getHitString(isHit));
+    isHit = -1;
+    printf("%s\n", getHitString(isHit));
+}
 
 
 int main(int argc, char* argv[])
 {
     mem_param_t mem_param = processArgs(argc, argv);
     trace_param_t trace_param;
-
-
-
-    // hit_count = 0;
-    // miss_count = 0;
-    // eviction_count = 0;
 
     size_t n_work_set = 1 << mem_param.s;
     size_t n_cache_line = mem_param.e;
@@ -683,7 +572,6 @@ int main(int argc, char* argv[])
     FILE* fp = fopen(mem_param.tracefile, "r");
     while (fscanf(fp, "%c %lx,%ld", &trace_param.operation, &trace_param.address, &trace_param.size) != EOF) {
         if (check_operation(trace_param.operation)) {
-            // size_t block_offset = getBlockOffset(trace_param.address, mem_param.s, mem_param.b);
             size_t set_index = getSetIndex(trace_param.address, mem_param.s, mem_param.b);
             size_t tag = getTag(trace_param.address, mem_param.s, mem_param.b);
             if (trace_param.operation == 'L') {
@@ -703,7 +591,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    // delete the space
+    // free the space
     for (i = 0; i < n_work_set; i++) {
         freeWorkSet(cache[i]);
         free(cache[i]);
@@ -711,15 +599,6 @@ int main(int argc, char* argv[])
 
     printSummary(hit_count, miss_count, eviction_count);
 
-    // work_set_t work_set;
-    // work_set.head = NULL;
-    // work_set.tail = NULL;
-    
-    // // cache_line_t cache_line;
-    // // work_set.head = ;
-    // // work_set.tail = ;
-    // cache_matrix = ()malloc();
-    // popWorkSet(work_set);
     // test1();
     // test2();
     // test3();
