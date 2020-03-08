@@ -572,6 +572,7 @@ int main(int argc, char* argv[])
     FILE* fp = fopen(mem_param.tracefile, "r");
     while (fscanf(fp, "%c %lx,%ld", &trace_param.operation, &trace_param.address, &trace_param.size) != EOF) {
         if (check_operation(trace_param.operation)) {
+            size_t block_offset = getBlockOffset(trace_param.address, mem_param.s, mem_param.b);
             size_t set_index = getSetIndex(trace_param.address, mem_param.s, mem_param.b);
             size_t tag = getTag(trace_param.address, mem_param.s, mem_param.b);
             if (trace_param.operation == 'L') {
@@ -584,7 +585,7 @@ int main(int argc, char* argv[])
                 hitString = modifyCache(cache[set_index], tag);
             }
             if (mem_param.visable) {
-                // printf("line record : %lx %lx %lx\n", tag, set_index, block_offset);
+                printf("line record : %lx %lx %lx\n", tag, set_index, block_offset);
                 printf("%c %lx,%ld %s\n", trace_param.operation, trace_param.address, trace_param.size, hitString);
             }
             free(hitString);
