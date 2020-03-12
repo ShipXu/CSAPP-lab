@@ -6,6 +6,7 @@
 ### 课程资源链接
 - [课程地址](https://www.bilibili.com/video/av31289365/?p=3&t=4)
 - [实验资源](http://csapp.cs.cmu.edu/3e/labs.html)
+- [课程pdf](http://www.cs.cmu.edu/afs/cs/academic/class/15213-f15/www/schedule.html)
 - [十分钟计算机](http://open.163.com/newview/movie/free?pid=MDGEPAQ4K&mid=MDGET74MS)：可以帮助理解计算机结构，更好地学习CSAPP课程
 - [关于总线部分的介绍视频](https://www.bilibili.com/video/av48866252?from=search&seid=17953179119607954171)
 
